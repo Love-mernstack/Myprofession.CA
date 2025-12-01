@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import AOS from "aos";
 import "aos/dist/aos.css";
@@ -8,18 +8,15 @@ import Image from "next/image";
 import {
   FaTwitter, FaLinkedin, FaGlobe,
   FaRegClock, FaCalendarAlt, FaChartLine,
-  FaArrowLeft, FaCheckCircle, FaMoneyBillWave,
-  FaLaptop, FaVideo, FaPhone, FaBrain,
-  FaBriefcase, FaUniversity, FaCertificate
+  FaCertificate, FaUniversity
 } from "react-icons/fa";
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { getMentorById } from '@/lib/api/mentorApi'; // Assuming this is your API import
+import { getMentorById } from '@/lib/api/mentorApi';
 
-// --- Reusable Components (from new static template) ---
+// --- Reusable Components ---
 
-// This component is now local, driven by the `mentor` state variable
 const SocialLinks = ({ socials }) => (
   <div className="flex flex-wrap gap-5 mt-4 justify-center lg:justify-start text-3xl text-blue-400">
     {socials.twitter && (
@@ -53,8 +50,6 @@ export default function MentorDetailPage() {
   const [mentor, setMentor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newReview, setNewReview] = useState("");
-  const [reviews, setReviews] = useState([]);
 
   useEffect(() => {
     AOS.init({ duration: 1000, once: true });
@@ -114,9 +109,6 @@ export default function MentorDetailPage() {
 
         setMentor(transformedMentor);
         
-        if (mentorData.reviews && Array.isArray(mentorData.reviews)) {
-          setReviews(mentorData.reviews);
-        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -174,11 +166,13 @@ export default function MentorDetailPage() {
     );
   }
 
-  // --- Main Content (New Design + API Data) ---
+  // --- Main Content ---
   return (
     <div className="bg-black text-white min-h-screen text-[18px] sm:text-[20px] font-sans">
       <Header />
       <section className="px-6 sm:px-8 md:px-14 lg:px-24 py-14 space-y-14 max-w-screen-xl mx-auto">
+        
+        {/* Top Profile Section */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
           <div className="lg:col-span-2 flex flex-col items-center text-center lg:text-left">
             <div className="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden border-4 border-blue-500">
@@ -231,7 +225,10 @@ export default function MentorDetailPage() {
           </div>
         </div>
 
+        {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          
+          {/* Left Column: Details */}
           <div className="lg:col-span-2 space-y-8" data-aos="fade-right">
             {/* About Section */}
             <div className="bg-[#0f172a] p-8 rounded-2xl border border-gray-700 shadow-lg">
@@ -288,46 +285,11 @@ export default function MentorDetailPage() {
                 </ul>
               </div>
             )}
-
-            <div className="bg-[#0f172a] p-8 rounded-2xl border border-gray-700 shadow-lg space-y-6">
-              <h2 className="text-3xl sm:text-4xl font-semibold text-blue-400">Reviews</h2>
-              <div className="space-y-5">
-                {reviews.length > 0 ? (
-                  reviews.map((review, idx) => (
-                    <div key={idx} className="bg-gray-800 p-5 rounded-xl">
-                      <p className="text-gray-200 text-lg sm:text-xl">“{review}”</p>
-                      <p className="text-sm sm:text-base text-gray-500 mt-2">– Anonymous</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-400 text-lg sm:text-xl">No reviews yet.</p>
-                )}
-              </div>
-
-              <div className="pt-5 border-t border-gray-600">
-                <h3 className="text-xl sm:text-2xl font-medium text-blue-300 mb-3">Add a Review</h3>
-                <textarea
-                  value={newReview}
-                  onChange={(e) => setNewReview(e.target.value)}
-                  placeholder="Share your experience..."
-                  className="w-full p-4 text-lg sm:text-xl bg-gray-800 text-white rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={4}
-                />
-                <button
-                  onClick={() => {
-                    if (newReview.trim()) {
-                      setReviews((prev) => [...prev, newReview]);
-                      setNewReview("");
-                    }
-                  }}
-                  className="mt-4 px-8 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-lg sm:text-xl font-medium"
-                >
-                  Submit Review
-                </button>
-              </div>
-            </div>
+            
+            {/* Reviews Section REMOVED here */}
           </div>
 
+          {/* Right Column: Stats */}
           <div className="space-y-8" data-aos="fade-left">
             <div className="bg-[#0e1a2b] border border-blue-800 rounded-2xl p-6 sm:p-8 shadow-lg">
               <div className="flex items-center gap-3 text-blue-400 text-2xl sm:text-3xl font-semibold mb-5">
@@ -351,13 +313,11 @@ export default function MentorDetailPage() {
                   border="border-green-500"
                   text="text-green-100"
                 />
-                
               </div>
             </div>
           </div>
         </div>
 
-        
       </section>
       <Footer />
     </div>

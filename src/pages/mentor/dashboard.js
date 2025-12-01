@@ -11,16 +11,19 @@ import { getDashboardProfile } from '@/lib/api/mentorApi';
 import InactiveProfileModal from "@/components/InactiveProfileModal";
 import { 
   FaCalendarDay, 
-  FaUserTie, 
-  FaUserGraduate, 
-  FaChartLine, 
-  FaClock,
+  FaUserTie,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaPlayCircle,
   FaMoneyBillWave,
+  FaUserGraduate,
+  FaVideo,
   FaStar,
-  FaTrophy,
+  FaChartLine,
   FaChartBar,
-  FaUsers,
-  FaVideo
+  FaTrophy,
+  FaClock,
+  FaUsers
 } from "react-icons/fa";
 
 export default function Dashboard() {
@@ -384,7 +387,7 @@ export default function Dashboard() {
             title="My Sessions"
             description="View your sessions"
             icon={FaUsers}
-            onClick={() => router.push("/mentor/myclasses")}
+            onClick={() => router.push("/mentor/my-sessions")}
           />
           <QuickActionCard
             title="My Earnings"

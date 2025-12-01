@@ -75,7 +75,7 @@ const MentorCard = ({ mentor }) => {
 export default function MentorListPage() {
   const [searchText, setSearchText] = useState("");
   const [selectedCategories, setSelectedCategories] = useState(["All"]);
-  const [sortOrder, setSortOrder] = useState("");
+  
 
   // --- 2. ADDED API States ---
   const [allMentors, setAllMentors] = useState([]); // Master list from API
@@ -131,20 +131,12 @@ export default function MentorListPage() {
       return matchText && matchCategory;
     });
 
-    // Sorting logic (no changes)
-    const sortMentors = {
-      az: () => filteredList.sort((a, b) => a.name.localeCompare(b.name)),
-      za: () => filteredList.sort((a, b) => b.name.localeCompare(a.name)),
-    };
-    if (sortMentors[sortOrder]) sortMentors[sortOrder]();
-
     setFiltered(filteredList);
-  }, [searchText, selectedCategories, sortOrder, allMentors]); // Re-run when master list changes
+  }, [searchText, selectedCategories, allMentors]); // Re-run when master list changes
 
   const resetFilters = () => {
     setSearchText("");
     setSelectedCategories(["All"]);
-    setSortOrder("");
   };
 
   return (
@@ -167,7 +159,7 @@ export default function MentorListPage() {
               onChange={(e) => setSearchText(e.target.value)}
               className="w-full px-5 py-3 rounded-full bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 text-base"
             />
-            {(searchText || !selectedCategories.includes("All") || sortOrder !== "") && (
+            {(searchText || !selectedCategories.includes("All")) && (
               <button
                 onClick={resetFilters}
                 className="p-3 bg-gray-800 border border-gray-600 rounded-full text-blue-400 hover:text-white hover:bg-blue-700 transition-all"
@@ -177,16 +169,6 @@ export default function MentorListPage() {
               </button>
             )}
           </div>
-
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="bg-gray-800 border border-gray-600 text-white px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-          >
-            <option value="" disabled>Sort by</option>
-            <option value="az">Name: A-Z</option>
-            <option value="za">Name: Z-A</option>
-          </select>
         </div>
 
         {/* Category Filters (Unchanged) */}

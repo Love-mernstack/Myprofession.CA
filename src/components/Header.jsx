@@ -310,6 +310,15 @@ export default function Header() {
                     </div>
 
                     <div className="py-1">
+                      <Link
+                        href="/my-sessions"
+                        onClick={handleLinkClick}
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 transition duration-200 rounded-lg"
+                      >
+                        <FaUser className="mr-3 w-4" />
+                        My Sessions
+                      </Link>
+
                       {user.role === 'MENTOR' && (
                         <Link
                           href="/mentor/myprofile"
@@ -425,6 +434,14 @@ export default function Header() {
               {isLoggedIn && user ? (
                 // LOGGED-IN (MOBILE)
                 <>
+                  <Link
+                    href="/my-sessions"
+                    onClick={handleLinkClick}
+                    className="block text-center w-full px-4 py-2 bg-gray-700 text-white rounded-lg transition"
+                  >
+                    My Sessions
+                  </Link>
+                  
                   {user.role === 'MENTOR' && (
                     <Link
                       href="/mentor/myprofile"

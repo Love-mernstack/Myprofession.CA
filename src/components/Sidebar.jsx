@@ -17,7 +17,7 @@ import {
 const navItems = [
   { label: "Dashboard", icon: FaTachometerAlt, path: "/mentor/dashboard" },
   { label: "My Profile", icon: FaUser, path: "/mentor/myprofile" },
-  { label: "My Classes", icon: FaChalkboardTeacher, path: "/mentor/myclasses" },
+  { label: "My Sessions", icon: FaChalkboardTeacher, path: "/mentor/my-sessions" },
   { label: "Availability", icon: FaLock, path: "/mentor/availability" },
 ];
 
