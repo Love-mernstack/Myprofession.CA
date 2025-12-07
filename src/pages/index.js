@@ -179,33 +179,38 @@ export default function HomePage() {
       </section>
 
       {/* --- CONTENT SECTION --- */}
-      <section className="bg-gradient-to-br from-[#111216] to-[#1b1f25] backdrop-blur-md py-12 px-6 md:px-20 text-white border-t border-[#2c2c32] relative">
+      <section className="bg-gradient-to-br from-[#111216] to-[#1b1f25] backdrop-blur-md py-16 px-6 md:px-20 text-white border-t border-[#2c2c32] relative">
         {/* Section number in top-left corner */}
         <div className="absolute top-4 left-4 px-2 py-1 bg-gray-800/50 text-gray-600 text-xs font-medium rounded-lg z-10 pointer-events-none border border-gray-700/30">
           Section 2
         </div>
-        <div className="container mx-auto max-w-7xl text-center">
-          <div data-aos="fade-up">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 inline-block">
-              <span className="bg-yellow-400 text-gray-900 font-bold px-4 py-2 rounded-lg">
-                Content and files
-              </span>
-            </h2>
-            <p className="text-base md:text-lg font-semibold text-blue-400 tracking-wider mb-4">
-              Read – Watch – Download – Follow
-            </p>
-            <div className="text-center max-w-full" data-aos="fade-up" data-aos-delay="100">
-              <div className="pl-5 pr-5 pb-8">
-                <p className="text-base text-white leading-relaxed mb-4 text-lg">
-                  Empower your professional journey with ready-to-use content, templates, everything a CA needs <br/> — from Income Tax to Audit — to work smarter every day
+        <div className="container mx-auto max-w-7xl">
+          {/* 2-Column Grid Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start" data-aos="fade-up">
+            
+            {/* Left Column - All Descriptions */}
+            <div className="space-y-8 text-left pr-8">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                <span className="bg-yellow-400 text-gray-900 font-bold px-5 py-3 rounded-lg">
+                  Content and files
+                </span>
+              </h2>
+              <p className="text-lg md:text-xl font-semibold text-blue-400 tracking-wide leading-relaxed">
+                Read – Watch – Download – Follow
+              </p>
+              <div className="space-y-6 bg-[#1a1a1e]/40 p-6 rounded-lg border border-gray-700/30">
+                <p className="text-base md:text-lg text-white leading-relaxed">
+                  Empower your professional journey with ready-to-use content, templates, everything a CA needs — from Income Tax to Audit — to work smarter every day
                 </p>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                   Here you can access practical files, step-by-step guides, and real-life case studies created by experienced professionals related to following categories:
                 </p>
               </div>
             </div>
+
+            {/* Right Column - Category Buttons */}
             <div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-6"
               data-aos="fade-up"
               data-aos-delay="200"
             >
@@ -218,6 +223,7 @@ export default function HomePage() {
                 />
               ))}
             </div>
+
           </div>
         </div>
       </section>

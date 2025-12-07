@@ -498,15 +498,8 @@ export default function BookingPage() {
                                 : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500"
                             }`}
                           >
-                            <div className="font-semibold text-center">{slot.startTime}</div>
-                            <div className="text-xs opacity-75 text-center">→ {slot.endTime}</div>
-                            <div className="text-xs text-center mt-1 opacity-60">
-                              {(() => {
-                                const start = new Date(`1970-01-01T${slot.startTime}:00`);
-                                const end = new Date(`1970-01-01T${slot.endTime}:00`);
-                                const duration = (end - start) / (1000 * 60);
-                                return `${duration} min`;
-                              })()}
+                            <div className="font-semibold text-center text-white whitespace-nowrap">
+                              {slot.startTime} → {slot.endTime}
                             </div>
                           </button>
                         ))}
