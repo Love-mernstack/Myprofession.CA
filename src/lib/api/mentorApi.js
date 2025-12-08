@@ -158,3 +158,37 @@ export const completeMentorProfile = async (profileData, token) => {
   });
   return response.data;
 };
+
+/**
+ * Fetches available calendar slots for a mentor (PUBLIC - no auth required)
+ * @param {string} mentorId - The ID of the mentor
+ * @param {string} startDate - The start date (YYYY-MM-DD)
+ * @param {string} endDate - The end date (YYYY-MM-DD)
+ * @returns {Promise<object>} The server response with calendar slots data
+ */
+export const getCalendarSlots = async (mentorId, startDate, endDate) => {
+  const response = await api.get(`/mentors/${mentorId}/slots/calendar`, {
+    params: { startDate, endDate }
+  });
+  return response.data;
+};
+
+/**
+ * Fetches available slots for a specific date (PUBLIC - no auth required)
+ * @param {string} mentorId - The ID of the mentor
+ * @param {string} date - The date (YYYY-MM-DD)
+ * @returns {Promise<object>} The server response with slots for the date
+ */
+export const getAvailableSlotsForDate = async (mentorId, date) => {
+  console.log('Fetching slots for:', { mentorId, date, dateType: typeof date });
+  try {
+    const response = await api.get(`/mentors/${mentorId}/slots`, {
+      params: { date }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('API Error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
