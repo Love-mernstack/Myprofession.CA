@@ -474,9 +474,8 @@ export default function BookingPage() {
         const result = await getAvailableSlotsForDate(mentorId, selectedDate);
         
         if (result.success) {
-          // Filter to show only available slots
-          const availableSlots = result.slots?.filter(slot => slot.available) || [];
-          setDateSlots(availableSlots);
+          // Show ALL slots (including booked ones with disabled state)
+          setDateSlots(result.slots || []);
         } else {
           setDateSlots([]);
         }
@@ -619,32 +618,45 @@ export default function BookingPage() {
                       ) : (
                         <>
                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                            {dateSlots.map((slot, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  setSelectedSlots(prev => {
-                                    const isAlreadySelected = prev.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
-                                    if (isAlreadySelected) {
-                                      // Remove slot if already selected
-                                      return prev.filter(s => !(s.startTime === slot.startTime && s.endTime === slot.endTime));
-                                    } else {
-                                      // Add slot to selection
-                                      return [...prev, slot];
-                                    }
-                                  });
-                                }}
-                                className={`p-3 rounded-lg text-xs sm:text-sm transition-all group border-2 ${
-                                  selectedSlots.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime)
-                                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/30 transform scale-105 border-blue-400"
-                                    : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500"
-                                }`}
-                              >
-                                <div className="font-semibold text-center text-white whitespace-nowrap">
-                                  {slot.startTime} → {slot.endTime}
-                                </div>
-                              </button>
-                            ))}
+                            {dateSlots.map((slot, idx) => {
+                              const isSelected = selectedSlots.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
+                              const isBooked = !slot.available;
+                              
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    if (isBooked) return; // Prevent clicking booked slots
+                                    
+                                    setSelectedSlots(prev => {
+                                      const isAlreadySelected = prev.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
+                                      if (isAlreadySelected) {
+                                        return prev.filter(s => !(s.startTime === slot.startTime && s.endTime === slot.endTime));
+                                      } else {
+                                        return [...prev, slot];
+                                      }
+                                    });
+                                  }}
+                                  disabled={isBooked}
+                                  className={`relative p-3 rounded-lg text-xs sm:text-sm transition-all group border-2 ${
+                                    isBooked
+                                      ? "bg-gray-800/30 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60"
+                                      : isSelected
+                                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/30 transform scale-105 border-blue-400"
+                                      : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500 cursor-pointer"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-center text-white whitespace-nowrap">
+                                    {slot.startTime} → {slot.endTime}
+                                  </div>
+                                  {isBooked && (
+                                    <div className="absolute top-1 right-1 bg-red-600/80 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                      BOOKED
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                           {dateSlots.length === 0 && (
                             <div className="text-center py-8 bg-gray-800/30 rounded-lg">

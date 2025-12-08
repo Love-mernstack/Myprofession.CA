@@ -32,3 +32,21 @@ export const cancelBooking = async (orderId) => {
   const response = await api.post('/booking/cancel', { orderId });
   return response.data;
 };
+
+/**
+ * Get user's bookings/sessions (for user dashboard)
+ * GET /api/v1/user/bookings?status=Scheduled&page=1&limit=20&upcoming=true
+ * @param {Object} params - Query parameters {status, page, limit, upcoming}
+ * @returns {Promise<object>} User's bookings with pagination
+ */
+export const getUserBookings = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (params.status) queryParams.append('status', params.status);
+  if (params.page) queryParams.append('page', params.page);
+  if (params.limit) queryParams.append('limit', params.limit);
+  if (params.upcoming !== undefined) queryParams.append('upcoming', params.upcoming);
+  
+  const response = await api.get(`/user/bookings?${queryParams.toString()}`);
+  return response.data;
+};

@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { fetchClasses } from '@/redux/classSlice';
 import { toast } from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
+import { getUserBookings } from '@/lib/api/bookingApi';
 
 export default function MySessionsPage() {
   const dispatch = useDispatch();
@@ -63,65 +64,51 @@ export default function MySessionsPage() {
     }
   }, [isAuthenticated, user, router, authCheckDelay]);
 
-  const allSessions = [
-    {
-      _id: '1',
-      date: '2025-08-01',
-      time: '10:00 AM',
-      withWhom: 'Alice Johnson',
-      status: 'Completed',
-      email: 'alice.johnson@example.com',
-      paymentStatus: 'Paid',
-      completionDate: '2025-08-01'
-    },
-    {
-      _id: '2',
-      date: '2025-08-02',
-      time: '11:30 AM',
-      withWhom: 'Michael Brown',
-      status: 'Completed',
-      email: 'michael.brown@example.com',
-      paymentStatus: 'Paid',
-      completionDate: '2025-08-02'
-    },
-    {
-      _id: '3',
-      date: '2025-08-05',
-      time: '03:00 PM',
-      withWhom: 'John Doe',
-      status: 'Upcoming',
-      email: 'john.doe@example.com',
-      paymentStatus: 'Paid'
-    },
-    {
-      _id: '4',
-      date: '2025-08-06',
-      time: '02:00 PM',
-      withWhom: 'Jane Smith',
-      status: 'Upcoming',
-      email: 'jane.smith@example.com',
-      paymentStatus: 'Paid'
-    },
-    {
-      _id: '5',
-      date: '2025-08-07',
-      time: '04:00 PM',
-      withWhom: 'Sarah Wilson',
-      status: 'Upcoming',
-      email: 'sarah.wilson@example.com',
-      paymentStatus: 'Paid'
-    }
-  ];
+  const [sessions, setSessions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Fetch user bookings
   useEffect(() => {
-    // Only fetch classes if user is authenticated and is a mentor
-    // Don't redirect here - that's handled by the main auth check
-    if (user && isAuthenticated && user.role === "MENTOR") {
-      dispatch(fetchClasses());
-    }
-  }, [user, isAuthenticated, dispatch]);
+    const loadBookings = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await getUserBookings({ limit: 100 });
+        
+        if (response.success) {
+          // Transform API data to match component structure
+          const transformedSessions = response.bookings.map(booking => ({
+            _id: booking._id,
+            date: new Date(booking.scheduledAt).toISOString().split('T')[0],
+            time: new Date(booking.scheduledAt).toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            withWhom: booking.mentor.name,
+            status: booking.status,
+            email: '', // Not provided by API for user bookings
+            paymentStatus: booking.order.status,
+            completionDate: booking.status === 'Completed' ? new Date(booking.scheduledAt).toISOString().split('T')[0] : null
+          }));
+          
+          setSessions(transformedSessions);
+        } else {
+          setError('Failed to load bookings');
+        }
+      } catch (err) {
+        console.error('Error loading bookings:', err);
+        setError(err.message || 'Failed to load bookings');
+        toast.error('Failed to load your sessions');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const [sessions, setSessions] = useState(allSessions);
+    loadBookings();
+  }, [isAuthenticated, user]);
 
   const handleRejectSession = (sessionId) => {
     toast.error(`Session ${sessionId} rejected`);
@@ -143,8 +130,11 @@ export default function MySessionsPage() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      'Scheduled': 'bg-blue-900 text-blue-300',
       'Upcoming': 'bg-blue-900 text-blue-300',
+      'InProgress': 'bg-yellow-900 text-yellow-300',
       'Completed': 'bg-green-900 text-green-300',
+      'Cancelled': 'bg-red-900 text-red-300',
       'Rejected': 'bg-red-900 text-red-300'
     };
 
@@ -156,13 +146,13 @@ export default function MySessionsPage() {
   };
 
   // --- FIX START: Wrapped in IF condition and removed extra closing bracket ---
-  if (isAuthLoading) {
+  if (isAuthLoading || isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg text-blue-400 mb-2">Loading your sessions...</p>
-          <p className="text-sm text-gray-400">Your mentor dashboard is just moments away</p>
+          <p className="text-sm text-gray-400">Your dashboard is just moments away</p>
         </div>
       </div>
     );
@@ -206,7 +196,7 @@ export default function MySessionsPage() {
               </thead>
               <tbody className="divide-y divide-gray-700">
                 {sessions
-                  .filter(session => session.status === 'Upcoming')
+                  .filter(session => session.status === 'Scheduled' || session.status === 'Upcoming')
                   .sort((a, b) => new Date(a.date) - new Date(b.date))
                   .map((session) => (
                     <tr key={session._id} className="hover:bg-gray-800 transition-colors">
@@ -251,7 +241,7 @@ export default function MySessionsPage() {
             </table>
           </div>
 
-          {sessions.filter(session => session.status === 'Upcoming').length === 0 && (
+          {sessions.filter(session => session.status === 'Scheduled' || session.status === 'Upcoming').length === 0 && (
             <div className="p-12 text-center">
               <p className="text-gray-400">No upcoming sessions found.</p>
             </div>
