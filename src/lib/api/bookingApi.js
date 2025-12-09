@@ -50,3 +50,33 @@ export const getUserBookings = async (params = {}) => {
   const response = await api.get(`/user/bookings?${queryParams.toString()}`);
   return response.data;
 };
+
+/**
+ * Get mentor's meetings (for mentor dashboard)
+ * GET /api/v1/mentor/meetings?status=Scheduled&page=1&limit=20&upcoming=true
+ * @param {Object} params - Query parameters {status, page, limit, upcoming}
+ * @returns {Promise<object>} Mentor's meetings with pagination
+ */
+export const getMentorMeetings = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (params.status) queryParams.append('status', params.status);
+  if (params.page) queryParams.append('page', params.page);
+  if (params.limit) queryParams.append('limit', params.limit);
+  if (params.upcoming !== undefined) queryParams.append('upcoming', params.upcoming);
+  
+  const response = await api.get(`/mentor/meetings?${queryParams.toString()}`);
+  return response.data;
+};
+
+/**
+ * Mentor cancels a meeting with refund
+ * POST /api/v1/mentor/meetings/:meetingId/cancel
+ * @param {string} meetingId - Meeting ID to cancel
+ * @param {string} reason - Cancellation reason
+ * @returns {Promise<object>} Cancellation confirmation
+ */
+export const cancelMentorMeeting = async (meetingId, reason) => {
+  const response = await api.post(`/mentor/meetings/${meetingId}/cancel`, { reason });
+  return response.data;
+};

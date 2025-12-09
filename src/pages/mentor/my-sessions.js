@@ -6,7 +6,7 @@ import { useRouter } from 'next/router';
 import { fetchClasses } from '@/redux/classSlice';
 import { toast } from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
-import { getUserBookings } from '@/lib/api/bookingApi';
+import { getMentorMeetings, cancelMentorMeeting } from '@/lib/api/bookingApi';
 
 export default function MySessionsPage() {
   const dispatch = useDispatch();
@@ -66,58 +66,110 @@ export default function MySessionsPage() {
 
   const [sessions, setSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancellingMeetingId, setCancellingMeetingId] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedMeetingId, setSelectedMeetingId] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
   const [error, setError] = useState(null);
 
-  // Fetch user bookings
+  // Fetch mentor meetings
   useEffect(() => {
-    const loadBookings = async () => {
+    const loadMeetings = async () => {
       if (!isAuthenticated || !user) return;
       
       try {
         setIsLoading(true);
         setError(null);
-        const response = await getUserBookings({ limit: 100 });
+        const response = await getMentorMeetings({ limit: 100 });
         
         if (response.success) {
           // Transform API data to match component structure
-          const transformedSessions = response.bookings.map(booking => ({
-            _id: booking._id,
-            date: new Date(booking.scheduledAt).toISOString().split('T')[0],
-            time: new Date(booking.scheduledAt).toLocaleTimeString('en-US', { 
+          const transformedSessions = response.meetings.map(meeting => ({
+            _id: meeting._id,
+            date: new Date(meeting.scheduledAt).toISOString().split('T')[0],
+            time: new Date(meeting.scheduledAt).toLocaleTimeString('en-US', { 
               hour: '2-digit', 
               minute: '2-digit' 
             }),
-            withWhom: booking.mentor.name,
-            status: booking.status,
-            email: '', // Not provided by API for user bookings
-            paymentStatus: booking.order.status,
-            completionDate: booking.status === 'Completed' ? new Date(booking.scheduledAt).toISOString().split('T')[0] : null
+            withWhom: meeting.user.name,
+            status: meeting.status,
+            email: meeting.user.email,
+            paymentStatus: meeting.order.status,
+            completionDate: meeting.status === 'Completed' ? new Date(meeting.scheduledAt).toISOString().split('T')[0] : null
           }));
           
           setSessions(transformedSessions);
         } else {
-          setError('Failed to load bookings');
+          setError('Failed to load meetings');
         }
       } catch (err) {
-        console.error('Error loading bookings:', err);
-        setError(err.message || 'Failed to load bookings');
+        console.error('Error loading meetings:', err);
+        setError(err.message || 'Failed to load meetings');
         toast.error('Failed to load your sessions');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadBookings();
+    loadMeetings();
   }, [isAuthenticated, user]);
 
-  const handleRejectSession = (sessionId) => {
-    toast.error(`Session ${sessionId} rejected`);
-    // Update session status to rejected
-    setSessions(prevSessions =>
-      prevSessions.map(session =>
-        session._id === sessionId ? { ...session, status: 'Rejected' } : session
-      )
-    );
+  const handleCancelClick = (sessionId) => {
+    setSelectedMeetingId(sessionId);
+    setCancellationReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelModalClose = () => {
+    setShowCancelModal(false);
+    setSelectedMeetingId(null);
+    setCancellationReason('');
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancellationReason || cancellationReason.trim() === '') {
+      toast.error('Please provide a reason for cancellation');
+      return;
+    }
+    
+    try {
+      setCancellingMeetingId(selectedMeetingId);
+      setShowCancelModal(false);
+      
+      const response = await cancelMentorMeeting(selectedMeetingId, cancellationReason.trim());
+      
+      if (response.success) {
+        toast.success('Meeting cancelled successfully. Refund has been initiated.');
+        
+        // Refresh meetings list
+        const updatedMeetings = await getMentorMeetings({ limit: 100 });
+        if (updatedMeetings.success) {
+          const transformedSessions = updatedMeetings.meetings.map(meeting => ({
+            _id: meeting._id,
+            date: new Date(meeting.scheduledAt).toISOString().split('T')[0],
+            time: new Date(meeting.scheduledAt).toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            withWhom: meeting.user.name,
+            status: meeting.status,
+            email: meeting.user.email,
+            paymentStatus: meeting.order.status,
+            completionDate: meeting.status === 'Completed' ? new Date(meeting.scheduledAt).toISOString().split('T')[0] : null
+          }));
+          setSessions(transformedSessions);
+        }
+      } else {
+        toast.error(response.message || 'Failed to cancel meeting');
+      }
+    } catch (err) {
+      console.error('Error cancelling meeting:', err);
+      toast.error(err.response?.data?.message || 'Failed to cancel meeting');
+    } finally {
+      setCancellingMeetingId(null);
+      setSelectedMeetingId(null);
+      setCancellationReason('');
+    }
   };
 
   const handleJoinSession = (sessionId) => {
@@ -228,10 +280,11 @@ export default function MySessionsPage() {
                             Join Now
                           </button>
                           <button
-                            onClick={() => handleRejectSession(session._id)}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition"
+                            onClick={() => handleCancelClick(session._id)}
+                            disabled={cancellingMeetingId === session._id}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Reject
+                            {cancellingMeetingId === session._id ? 'Cancelling...' : 'Cancel'}
                           </button>
                         </div>
                       </td>
@@ -303,6 +356,51 @@ export default function MySessionsPage() {
           )}
         </div>
       </main>
+
+      {/* Cancellation Reason Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-700 max-w-md w-full">
+            <div className="p-6 border-b border-gray-700">
+              <h3 className="text-xl font-semibold text-white">Cancel Meeting</h3>
+              <p className="text-sm text-gray-400 mt-1">Please provide a reason for cancellation</p>
+            </div>
+            
+            <div className="p-6">
+              <label htmlFor="cancellation-reason" className="block text-sm font-medium text-gray-300 mb-2">
+                Cancellation Reason *
+              </label>
+              <textarea
+                id="cancellation-reason"
+                rows={4}
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="e.g., Emergency came up, need to reschedule..."
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                The user will be notified and a full refund will be initiated automatically.
+              </p>
+            </div>
+
+            <div className="p-6 border-t border-gray-700 flex gap-3 justify-end">
+              <button
+                onClick={handleCancelModalClose}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition font-medium"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmCancellation}
+                disabled={!cancellationReason.trim()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

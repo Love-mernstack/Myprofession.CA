@@ -640,19 +640,22 @@ export default function BookingPage() {
                                   disabled={isBooked}
                                   className={`relative p-3 rounded-lg text-xs sm:text-sm transition-all group border-2 ${
                                     isBooked
-                                      ? "bg-gray-800/30 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60"
+                                      ? "bg-gray-900/70 text-gray-500 border-red-900/50 cursor-not-allowed opacity-80 hover:opacity-80"
                                       : isSelected
                                       ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/30 transform scale-105 border-blue-400"
                                       : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500 cursor-pointer"
                                   }`}
                                 >
-                                  <div className="font-semibold text-center text-white whitespace-nowrap">
+                                  <div className={`font-semibold text-center whitespace-nowrap ${isBooked ? 'line-through text-gray-600' : 'text-white'}`}>
                                     {slot.startTime} → {slot.endTime}
                                   </div>
                                   {isBooked && (
-                                    <div className="absolute top-1 right-1 bg-red-600/80 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                      BOOKED
-                                    </div>
+                                    <>
+                                      <div className="absolute top-1 right-1 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg">
+                                        BOOKED
+                                      </div>
+                                      <div className="absolute inset-0 bg-gray-900/40 rounded-lg pointer-events-none"></div>
+                                    </>
                                   )}
                                 </button>
                               );
