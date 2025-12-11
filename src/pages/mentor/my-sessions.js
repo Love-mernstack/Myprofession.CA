@@ -172,12 +172,64 @@ export default function MySessionsPage() {
     }
   };
 
-  const handleJoinSession = (sessionId) => {
-    toast.success(`Joining session ${sessionId}...`);
-    // In real implementation, this would open the meeting link/video call
-    setTimeout(() => {
-      toast("Video call feature would open here");
-    }, 1000);
+  const formatTimeUntilMeeting = (milliseconds) => {
+    const minutes = Math.ceil(milliseconds / 60000);
+    
+    if (minutes < 60) {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours < 24) {
+      if (remainingMinutes > 0) {
+        return `${hours} hour${hours !== 1 ? 's' : ''} and ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+      }
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
+    
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    
+    if (remainingHours > 0) {
+      return `${days} day${days !== 1 ? 's' : ''} and ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
+    }
+    return `${days} day${days !== 1 ? 's' : ''}`;
+  };
+
+  const handleJoinSession = (sessionId, scheduledAt, status) => {
+    // Check if meeting is still scheduled
+    if (status === 'Cancelled') {
+      toast.error('This meeting has been cancelled');
+      return;
+    }
+    
+    if (status === 'Completed') {
+      toast.error('This meeting has already ended');
+      return;
+    }
+    
+    // Check time window (mentor can join 15 min before, 30 min after)
+    const now = new Date();
+    const meetingTime = new Date(scheduledAt);
+    const allowedStartTime = new Date(meetingTime.getTime() - 15 * 60 * 1000);
+    const allowedEndTime = new Date(meetingTime.getTime() + 30 * 60 * 1000);
+    
+    if (now < allowedStartTime) {
+      const timeUntil = allowedStartTime - now;
+      const formattedTime = formatTimeUntilMeeting(timeUntil);
+      toast.error(`Meeting can be joined in ${formattedTime}`);
+      return;
+    }
+    
+    if (now > allowedEndTime) {
+      toast.error('Meeting join window has expired');
+      return;
+    }
+    
+    // Route to meeting page
+    router.push(`/meeting/${sessionId}`);
   };
 
   const getStatusBadge = (status) => {
@@ -274,10 +326,10 @@ export default function MySessionsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleJoinSession(session._id)}
+                            onClick={() => handleJoinSession(session._id, session.date + 'T' + session.time, session.status)}
                             className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded transition"
                           >
-                            Join Now
+                            Start Meeting
                           </button>
                           <button
                             onClick={() => handleCancelClick(session._id)}

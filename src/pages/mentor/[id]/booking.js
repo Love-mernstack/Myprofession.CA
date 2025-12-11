@@ -27,7 +27,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [hoveredDay, setHoveredDay] = useState(null);
   
   const navigateMonth = (direction) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
@@ -56,8 +55,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
           ${!isPast && !hasEvents && 'opacity-60'}
         `}
         onClick={() => !isPast && isAvailable && onSelect(dateStr)}
-        onMouseEnter={() => setHoveredDay(dateStr)}
-        onMouseLeave={() => setHoveredDay(null)}
       >
         <div className="text-center">
           <div className={`text-sm font-medium ${isSelected ? 'text-blue-300' : isPast ? 'text-gray-500' : isAvailable ? 'text-white' : 'text-gray-600'}`}>
@@ -71,25 +68,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
         {isAvailable && (
           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
             <div className={`w-2 h-2 bg-green-600 rounded-full`}></div>
-          </div>
-        )}
-        
-        {hoveredDay === dateStr && hasEvents && (
-          <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 p-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl">
-            <div className="text-white text-xs">
-              <div className="font-semibold mb-1">{dayName}</div>
-              <div className="space-y-1">
-                {hasEvents.slots.map((slot, idx) => (
-                  <div key={idx} className="flex items-center gap-1 text-xs">
-                    <FaClock className="text-blue-400" />
-                    <span>{slot.startTime} - {slot.endTime}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-px">
-              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-            </div>
           </div>
         )}
       </div>
@@ -433,7 +411,7 @@ export default function BookingPage() {
       if (verificationResponse.success) {
         alert('🎉 Booking confirmed successfully! You will receive a confirmation email.');
         // Redirect to dashboard or bookings page
-        router.push('/dashboard');
+        router.push('/my-orders');
       } else {
         throw new Error(verificationResponse.message || 'Payment verification failed');
       }

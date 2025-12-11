@@ -214,12 +214,13 @@ export default function HomePage() {
               data-aos="fade-up"
               data-aos-delay="200"
             >
-              {contentCategories.map((category) => (
+              {contentCategories.map((category, index) => (
                 <CategoryCard
                   key={category.name}
                   icon={category.icon}
                   title={category.name}
                   onClick={() => router.push(category.path)}
+                  className={index === contentCategories.length - 1 ? "sm:col-span-2 sm:justify-self-center w-full sm:w-[calc(50%-0.75rem)]" : ""}
                 />
               ))}
             </div>
@@ -340,15 +341,15 @@ function MentorCard({ mentor }) {
 
 
 // --- ✅ MODIFIED: "CategoryCard" Component (with exciting arrow) ---
-function CategoryCard({ icon, title, onClick }) {
+function CategoryCard({ icon, title, onClick, className = "" }) {
   return (
     <div 
       onClick={onClick} 
-      className="group cursor-pointer rounded-xl bg-[#1a1a1e] p-6 text-left
+      className={`group cursor-pointer rounded-xl bg-[#1a1a1e] p-6 text-left
                  border border-gray-700/80
                  transition-all duration-300
                  hover:border-blue-500/80 hover:bg-[#202024] 
-                 hover:shadow-xl hover:-translate-y-1" // Subtle lift effect
+                 hover:shadow-xl hover:-translate-y-1 ${className}`} // Subtle lift effect
     >
       {/* This flex container pushes the arrow to the right */}
       <div className="flex items-center justify-between gap-4">
