@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/router'; // Pages Router uses next/router, not next/navigation
+import Script from 'next/script';
+import { useDispatch, useSelector } from "react-redux";
 import { 
   FaComments, FaVideo, FaArrowLeft, FaCalendarAlt, 
   FaClock, FaUser, FaMapMarkerAlt, FaStar, FaCheck, FaVideoSlash,
   FaBusinessTime
 } from "react-icons/fa";
-import Image from "next/image";
-import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { getMentorById } from '@/lib/api/mentorApi';
+import AuthModal from "@/components/AuthModal";
+import { setLoginSuccess } from "@/redux/authSlice";
+import { getMentorById, getCalendarSlots, getAvailableSlotsForDate } from '@/lib/api/mentorApi';
+import { createBooking, verifyPayment, cancelBooking } from '@/lib/api/bookingApi';
 
 const MODES = [
   { type: "chat", icon: <FaComments />, label: "Chat" },
@@ -25,7 +27,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [hoveredDay, setHoveredDay] = useState(null);
   
   const navigateMonth = (direction) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
@@ -54,8 +55,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
           ${!isPast && !hasEvents && 'opacity-60'}
         `}
         onClick={() => !isPast && isAvailable && onSelect(dateStr)}
-        onMouseEnter={() => setHoveredDay(dateStr)}
-        onMouseLeave={() => setHoveredDay(null)}
       >
         <div className="text-center">
           <div className={`text-sm font-medium ${isSelected ? 'text-blue-300' : isPast ? 'text-gray-500' : isAvailable ? 'text-white' : 'text-gray-600'}`}>
@@ -69,25 +68,6 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
         {isAvailable && (
           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
             <div className={`w-2 h-2 bg-green-600 rounded-full`}></div>
-          </div>
-        )}
-        
-        {hoveredDay === dateStr && hasEvents && (
-          <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 p-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl">
-            <div className="text-white text-xs">
-              <div className="font-semibold mb-1">{dayName}</div>
-              <div className="space-y-1">
-                {hasEvents.slots.map((slot, idx) => (
-                  <div key={idx} className="flex items-center gap-1 text-xs">
-                    <FaClock className="text-blue-400" />
-                    <span>{slot.startTime} - {slot.endTime}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-px">
-              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-            </div>
           </div>
         )}
       </div>
@@ -178,9 +158,13 @@ const CustomCalendar = ({ selected, onSelect, dayWiseAvailableDates }) => {
 };
 
 export default function BookingPage() {
-  const params = useParams();
   const router = useRouter();
-  const mentorId = params?.id;
+  const dispatch = useDispatch();
+  const mentorId = router.query.id; // Pages Router uses router.query, not useParams()
+  
+  // Auth state from Redux
+  const { user, isLoggedIn, authLoading } = useSelector(state => state.auth);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const [mentor, setMentor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -192,8 +176,11 @@ export default function BookingPage() {
   const [selectedMode, setSelectedMode] = useState("video");
   const [meetingTopic, setMeetingTopic] = useState("");
   const [isBookingLoading, setIsBookingLoading] = useState(false);
-
-  
+  const [calendarSlots, setCalendarSlots] = useState([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [dateSlots, setDateSlots] = useState([]);
+  const [isLoadingDateSlots, setIsLoadingDateSlots] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   useEffect(() => {
     if (!mentorId) {
@@ -247,47 +234,50 @@ export default function BookingPage() {
     fetchMentorDetails();
   }, [mentorId]);
 
-  // Function to convert day-wise availability to calendar dates
-  const generateAvailableDatesFromDayWise = (dayWiseAvailability) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to midnight to avoid timezone issues
-    const dates = [];
+  // Fetch calendar slots when mentor is loaded
+  useEffect(() => {
+    if (!mentorId) return;
 
-    // Generate dates for the next 60 days to cover current and next month
-    for (let i = 0; i < 60; i++) {
-      const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() + i);
-      
-      // Normalize date to avoid timezone issues
-      currentDate.setHours(0, 0, 0, 0);
-      
-      const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
-      
-      const dayAvailability = dayWiseAvailability.find(day => day.day === dayOfWeek);
-      if (dayAvailability && dayAvailability.slots && dayAvailability.slots.length > 0) {
-        // Format date as YYYY-MM-DD in local timezone
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
+    const fetchCalendarSlots = async () => {
+      try {
+        setIsLoadingSlots(true);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startDate = today.toISOString().split('T')[0];
         
-        dates.push({
-          date: dateStr,
-          day: dayOfWeek,
-          slots: dayAvailability.slots,
-          originalData: dayAvailability
-        });
+        // Fetch slots for next 60 days
+        const endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 60);
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        console.log('Fetching calendar slots for mentorId:', mentorId);
+        const result = await getCalendarSlots(mentorId, startDate, endDateStr);
+        
+        if (result.success) {
+          setCalendarSlots(result.slots || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch calendar slots:', err);
+      } finally {
+        setIsLoadingSlots(false);
       }
-    }
-    
-    return dates;
-  };
+    };
 
-  // Generate all available dates from day-wise availability
-  const dayWiseAvailableDates = generateAvailableDatesFromDayWise(mentor?.availabilitySchedule || []);
+    fetchCalendarSlots();
+  }, [mentorId]);
+
+  // Use calendar slots from API (already filtered for booked slots)
+  const dayWiseAvailableDates = calendarSlots.map(slot => ({
+    date: slot.date,
+    day: slot.dayOfWeek,
+    slots: slot.availableSlots.filter(s => s.available), // Only show available slots
+    isBlocked: slot.isBlocked
+  }));
   
-  // Get unique dates from day-wise availability
-  const uniqueAvailableDates = dayWiseAvailableDates.map(d => d.date);
+  // Get unique dates that have available slots
+  const uniqueAvailableDates = dayWiseAvailableDates
+    .filter(d => d.slots && d.slots.length > 0)
+    .map(d => d.date);
 
   // Function to get price per 15-minute session based on selected mode
   const getPricePer15Minutes = (mode) => {
@@ -320,6 +310,12 @@ export default function BookingPage() {
 
   // Function to handle booking submission
   const handleBookingSubmit = async () => {
+    // Check if user is logged in first
+    if (!isLoggedIn || !user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!selectedDate || selectedSlots.length === 0 || !meetingTopic.trim()) {
       alert("Please select a date, at least one time slot, and provide a meeting topic");
       return;
@@ -328,6 +324,12 @@ export default function BookingPage() {
     // Check if pricing is available
     if (!mentor?.pricing) {
       alert("Pricing information is not available for this mentor. Please contact support.");
+      return;
+    }
+
+    // Check if Razorpay is loaded
+    if (!razorpayLoaded || typeof window.Razorpay === 'undefined') {
+      alert("Payment system is loading. Please try again in a moment.");
       return;
     }
 
@@ -341,45 +343,130 @@ export default function BookingPage() {
     setIsBookingLoading(true);
     
     try {
-      const bookingData = {
-        mentorId: mentor.id,
+      // Format slots for backend
+      const formattedSlots = selectedSlots.map(slot => ({
         date: selectedDate,
-        slots: selectedSlots, // Send array of selected slots
-        mode: selectedMode,
-        duration: totalDuration, // Total duration in minutes
-        topic: meetingTopic.trim(),
-        totalPrice: priceForDuration.replace('₹', '')
-      };
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        sessionType: selectedMode
+      }));
 
-      // This would be your API call to submit the booking
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingData),
+      // Create booking and get Razorpay order
+      const bookingResponse = await createBooking({
+        mentorId: mentor.id,
+        slots: formattedSlots
       });
 
-      if (response.ok) {
-        alert('Sessions booked successfully! You will receive a confirmation email.');
-        router.push('/dashboard'); // Redirect to dashboard after successful booking
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to book session. Please try again.');
+      if (!bookingResponse.success) {
+        throw new Error(bookingResponse.message || 'Failed to create booking');
       }
+
+      const { order } = bookingResponse;
+
+      // Initialize Razorpay payment
+      const options = {
+        key: order.razorpayKeyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "CA Mentorship",
+        description: `Session with ${order.mentor.name}`,
+        order_id: order.razorpayOrderId,
+        handler: async function (response) {
+          await handlePaymentSuccess(response, order.orderId);
+        },
+        prefill: {
+          name: "",
+          email: "",
+          contact: ""
+        },
+        theme: {
+          color: "#3B82F6"
+        },
+        modal: {
+          ondismiss: function() {
+            handlePaymentDismiss(order.orderId);
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+
     } catch (error) {
       console.error('Booking error:', error);
-      alert('Failed to book session. Please try again.');
+      alert(error.message || 'Failed to create booking. Please try again.');
+      setIsBookingLoading(false);
+    }
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = async (paymentResponse, orderId) => {
+    try {
+      const verificationResponse = await verifyPayment({
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        razorpay_order_id: paymentResponse.razorpay_order_id,
+        razorpay_signature: paymentResponse.razorpay_signature
+      });
+
+      if (verificationResponse.success) {
+        alert('🎉 Booking confirmed successfully! You will receive a confirmation email.');
+        // Redirect to dashboard or bookings page
+        router.push('/my-orders');
+      } else {
+        throw new Error(verificationResponse.message || 'Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      alert('Payment succeeded but verification failed. Please contact support with your payment details.');
     } finally {
       setIsBookingLoading(false);
     }
   };
 
-  // Function to get available slots for selected date
-  const getAvailableSlotsForDate = () => {
-    const selectedDateInfo = dayWiseAvailableDates.find(d => d.date === selectedDate);
-    return selectedDateInfo?.slots || [];
+  // Handle payment modal dismissal
+  const handlePaymentDismiss = async (orderId) => {
+    try {
+      // Cancel the booking to release locked slots
+      await cancelBooking(orderId);
+      alert('Booking cancelled. Slots have been released.');
+    } catch (error) {
+      console.error('Cancel booking error:', error);
+      alert('Payment was cancelled. Slots will be automatically released in 10 minutes.');
+    } finally {
+      setIsBookingLoading(false);
+    }
   };
+
+  // Fetch slots when a date is selected
+  useEffect(() => {
+    // Guard: Ensure both selectedDate and mentorId are available before fetching
+    if (!selectedDate || !mentorId) {
+      console.log('Skipping slot fetch - selectedDate or mentorId not available:', { selectedDate, mentorId });
+      return;
+    }
+
+    const fetchSlotsForDate = async () => {
+      try {
+        setIsLoadingDateSlots(true);
+        console.log('Fetching slots for date:', selectedDate, 'mentorId:', mentorId);
+        const result = await getAvailableSlotsForDate(mentorId, selectedDate);
+        
+        if (result.success) {
+          // Show ALL slots (including booked ones with disabled state)
+          setDateSlots(result.slots || []);
+        } else {
+          setDateSlots([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch slots for date:', err);
+        setDateSlots([]);
+      } finally {
+        setIsLoadingDateSlots(false);
+      }
+    };
+
+    fetchSlotsForDate();
+  }, [selectedDate, mentorId]);
 
   // Loading State
   if (isLoading) {
@@ -422,6 +509,27 @@ export default function BookingPage() {
 
   return (
     <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white min-h-screen">
+      {/* Authentication Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onLoginSuccess={(user) => {
+            dispatch(setLoginSuccess(user));
+            setShowAuthModal(false);
+          }}
+        />
+      )}
+      
+      {/* Load Razorpay Checkout Script */}
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        onLoad={() => setRazorpayLoaded(true)}
+        onError={() => {
+          console.error('Failed to load Razorpay script');
+          setRazorpayLoaded(false);
+        }}
+      />
+      
       <Header />
       
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
@@ -454,7 +562,12 @@ export default function BookingPage() {
                 Select Date & Time
               </h3>
               
-              {dayWiseAvailableDates.length > 0 ? (
+              {isLoadingSlots ? (
+                <div className="text-center py-12 bg-gray-800/30 rounded-lg">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                  <p className="text-gray-400">Loading available slots...</p>
+                </div>
+              ) : dayWiseAvailableDates.length > 0 ? (
                 <div className="space-y-4">
                   {/* Enhanced Calendar with Events */}
                   <CustomCalendar
@@ -475,48 +588,65 @@ export default function BookingPage() {
                           {selectedSlots.length > 0 && `${selectedSlots.length} slot${selectedSlots.length !== 1 ? 's' : ''} selected`}
                         </p>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {getAvailableSlotsForDate().map((slot, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              const slotKey = `${slot.startTime}-${slot.endTime}`;
-                              setSelectedSlots(prev => {
-                                const isAlreadySelected = prev.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
-                                if (isAlreadySelected) {
-                                  // Remove slot if already selected
-                                  return prev.filter(s => !(s.startTime === slot.startTime && s.endTime === slot.endTime));
-                                } else {
-                                  // Add slot to selection
-                                  return [...prev, slot];
-                                }
-                              });
-                            }}
-                            className={`p-3 rounded-lg text-xs sm:text-sm transition-all group border-2 ${
-                              selectedSlots.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime)
-                                ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/30 transform scale-105 border-blue-400"
-                                : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500"
-                            }`}
-                          >
-                            <div className="font-semibold text-center">{slot.startTime}</div>
-                            <div className="text-xs opacity-75 text-center">→ {slot.endTime}</div>
-                            <div className="text-xs text-center mt-1 opacity-60">
-                              {(() => {
-                                const start = new Date(`1970-01-01T${slot.startTime}:00`);
-                                const end = new Date(`1970-01-01T${slot.endTime}:00`);
-                                const duration = (end - start) / (1000 * 60);
-                                return `${duration} min`;
-                              })()}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      {getAvailableSlotsForDate().length === 0 && (
+                      {isLoadingDateSlots ? (
                         <div className="text-center py-8 bg-gray-800/30 rounded-lg">
-                          <FaVideoSlash className="text-3xl text-gray-500 mx-auto mb-2" />
-                          <p className="text-gray-400">No available slots</p>
-                          <p className="text-gray-500 text-sm">Please select another date</p>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                          <p className="text-gray-400 text-sm">Loading time slots...</p>
                         </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {dateSlots.map((slot, idx) => {
+                              const isSelected = selectedSlots.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
+                              const isBooked = !slot.available;
+                              
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    if (isBooked) return; // Prevent clicking booked slots
+                                    
+                                    setSelectedSlots(prev => {
+                                      const isAlreadySelected = prev.some(s => s.startTime === slot.startTime && s.endTime === slot.endTime);
+                                      if (isAlreadySelected) {
+                                        return prev.filter(s => !(s.startTime === slot.startTime && s.endTime === slot.endTime));
+                                      } else {
+                                        return [...prev, slot];
+                                      }
+                                    });
+                                  }}
+                                  disabled={isBooked}
+                                  className={`relative p-3 rounded-lg text-xs sm:text-sm transition-all group border-2 ${
+                                    isBooked
+                                      ? "bg-gray-900/70 text-gray-500 border-red-900/50 cursor-not-allowed opacity-80 hover:opacity-80"
+                                      : isSelected
+                                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/30 transform scale-105 border-blue-400"
+                                      : "bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700 hover:border-blue-500 cursor-pointer"
+                                  }`}
+                                >
+                                  <div className={`font-semibold text-center whitespace-nowrap ${isBooked ? 'line-through text-gray-600' : 'text-white'}`}>
+                                    {slot.startTime} → {slot.endTime}
+                                  </div>
+                                  {isBooked && (
+                                    <>
+                                      <div className="absolute top-1 right-1 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg">
+                                        BOOKED
+                                      </div>
+                                      <div className="absolute inset-0 bg-gray-900/40 rounded-lg pointer-events-none"></div>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {dateSlots.length === 0 && (
+                            <div className="text-center py-8 bg-gray-800/30 rounded-lg">
+                              <FaVideoSlash className="text-3xl text-gray-500 mx-auto mb-2" />
+                              <p className="text-gray-400">No available slots</p>
+                              <p className="text-gray-500 text-sm">Please select another date</p>
+                            </div>
+                          )}
+                        </>
                       )}
                       
                       {selectedSlots.length > 0 && (
@@ -769,7 +899,7 @@ export default function BookingPage() {
             {!selectedDate && uniqueAvailableDates.length > 0 && (
               <p className="text-center text-gray-500 text-xs">Select a date to continue</p>
             )}
-            {selectedDate && selectedSlots.length === 0 && getAvailableSlotsForDate().length > 0 && (
+            {selectedDate && selectedSlots.length === 0 && dateSlots.length > 0 && (
               <p className="text-center text-gray-500 text-xs">Choose one or more time slots</p>
             )}
             {selectedDate && selectedSlots.length > 0 && !meetingTopic.trim() && (

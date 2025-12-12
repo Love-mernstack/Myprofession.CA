@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { fetchClasses } from '@/redux/classSlice';
 import { toast } from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
+import { getMentorMeetings, cancelMentorMeeting } from '@/lib/api/bookingApi';
 
 export default function MySessionsPage() {
   const dispatch = useDispatch();
@@ -63,88 +64,181 @@ export default function MySessionsPage() {
     }
   }, [isAuthenticated, user, router, authCheckDelay]);
 
-  const allSessions = [
-    {
-      _id: '1',
-      date: '2025-08-01',
-      time: '10:00 AM',
-      withWhom: 'Alice Johnson',
-      status: 'Completed',
-      email: 'alice.johnson@example.com',
-      paymentStatus: 'Paid',
-      completionDate: '2025-08-01'
-    },
-    {
-      _id: '2',
-      date: '2025-08-02',
-      time: '11:30 AM',
-      withWhom: 'Michael Brown',
-      status: 'Completed',
-      email: 'michael.brown@example.com',
-      paymentStatus: 'Paid',
-      completionDate: '2025-08-02'
-    },
-    {
-      _id: '3',
-      date: '2025-08-05',
-      time: '03:00 PM',
-      withWhom: 'John Doe',
-      status: 'Upcoming',
-      email: 'john.doe@example.com',
-      paymentStatus: 'Paid'
-    },
-    {
-      _id: '4',
-      date: '2025-08-06',
-      time: '02:00 PM',
-      withWhom: 'Jane Smith',
-      status: 'Upcoming',
-      email: 'jane.smith@example.com',
-      paymentStatus: 'Paid'
-    },
-    {
-      _id: '5',
-      date: '2025-08-07',
-      time: '04:00 PM',
-      withWhom: 'Sarah Wilson',
-      status: 'Upcoming',
-      email: 'sarah.wilson@example.com',
-      paymentStatus: 'Paid'
-    }
-  ];
+  const [sessions, setSessions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cancellingMeetingId, setCancellingMeetingId] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedMeetingId, setSelectedMeetingId] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [error, setError] = useState(null);
 
+  // Fetch mentor meetings
   useEffect(() => {
-    // Only fetch classes if user is authenticated and is a mentor
-    // Don't redirect here - that's handled by the main auth check
-    if (user && isAuthenticated && user.role === "MENTOR") {
-      dispatch(fetchClasses());
-    }
-  }, [user, isAuthenticated, dispatch]);
+    const loadMeetings = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await getMentorMeetings({ limit: 100 });
+        
+        if (response.success) {
+          // Transform API data to match component structure
+          const transformedSessions = response.meetings.map(meeting => ({
+            _id: meeting._id,
+            date: new Date(meeting.scheduledAt).toISOString().split('T')[0],
+            time: new Date(meeting.scheduledAt).toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            withWhom: meeting.user.name,
+            status: meeting.status,
+            email: meeting.user.email,
+            paymentStatus: meeting.order.status,
+            completionDate: meeting.status === 'Completed' ? new Date(meeting.scheduledAt).toISOString().split('T')[0] : null
+          }));
+          
+          setSessions(transformedSessions);
+        } else {
+          setError('Failed to load meetings');
+        }
+      } catch (err) {
+        console.error('Error loading meetings:', err);
+        setError(err.message || 'Failed to load meetings');
+        toast.error('Failed to load your sessions');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const [sessions, setSessions] = useState(allSessions);
+    loadMeetings();
+  }, [isAuthenticated, user]);
 
-  const handleRejectSession = (sessionId) => {
-    toast.error(`Session ${sessionId} rejected`);
-    // Update session status to rejected
-    setSessions(prevSessions =>
-      prevSessions.map(session =>
-        session._id === sessionId ? { ...session, status: 'Rejected' } : session
-      )
-    );
+  const handleCancelClick = (sessionId) => {
+    setSelectedMeetingId(sessionId);
+    setCancellationReason('');
+    setShowCancelModal(true);
   };
 
-  const handleJoinSession = (sessionId) => {
-    toast.success(`Joining session ${sessionId}...`);
-    // In real implementation, this would open the meeting link/video call
-    setTimeout(() => {
-      toast("Video call feature would open here");
-    }, 1000);
+  const handleCancelModalClose = () => {
+    setShowCancelModal(false);
+    setSelectedMeetingId(null);
+    setCancellationReason('');
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancellationReason || cancellationReason.trim() === '') {
+      toast.error('Please provide a reason for cancellation');
+      return;
+    }
+    
+    try {
+      setCancellingMeetingId(selectedMeetingId);
+      setShowCancelModal(false);
+      
+      const response = await cancelMentorMeeting(selectedMeetingId, cancellationReason.trim());
+      
+      if (response.success) {
+        toast.success('Meeting cancelled successfully. Refund has been initiated.');
+        
+        // Refresh meetings list
+        const updatedMeetings = await getMentorMeetings({ limit: 100 });
+        if (updatedMeetings.success) {
+          const transformedSessions = updatedMeetings.meetings.map(meeting => ({
+            _id: meeting._id,
+            date: new Date(meeting.scheduledAt).toISOString().split('T')[0],
+            time: new Date(meeting.scheduledAt).toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            withWhom: meeting.user.name,
+            status: meeting.status,
+            email: meeting.user.email,
+            paymentStatus: meeting.order.status,
+            completionDate: meeting.status === 'Completed' ? new Date(meeting.scheduledAt).toISOString().split('T')[0] : null
+          }));
+          setSessions(transformedSessions);
+        }
+      } else {
+        toast.error(response.message || 'Failed to cancel meeting');
+      }
+    } catch (err) {
+      console.error('Error cancelling meeting:', err);
+      toast.error(err.response?.data?.message || 'Failed to cancel meeting');
+    } finally {
+      setCancellingMeetingId(null);
+      setSelectedMeetingId(null);
+      setCancellationReason('');
+    }
+  };
+
+  const formatTimeUntilMeeting = (milliseconds) => {
+    const minutes = Math.ceil(milliseconds / 60000);
+    
+    if (minutes < 60) {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours < 24) {
+      if (remainingMinutes > 0) {
+        return `${hours} hour${hours !== 1 ? 's' : ''} and ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+      }
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
+    
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    
+    if (remainingHours > 0) {
+      return `${days} day${days !== 1 ? 's' : ''} and ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
+    }
+    return `${days} day${days !== 1 ? 's' : ''}`;
+  };
+
+  const handleJoinSession = (sessionId, scheduledAt, status) => {
+    // Check if meeting is still scheduled
+    if (status === 'Cancelled') {
+      toast.error('This meeting has been cancelled');
+      return;
+    }
+    
+    if (status === 'Completed') {
+      toast.error('This meeting has already ended');
+      return;
+    }
+    
+    // Check time window (mentor can join 15 min before, 30 min after)
+    const now = new Date();
+    const meetingTime = new Date(scheduledAt);
+    const allowedStartTime = new Date(meetingTime.getTime() - 15 * 60 * 1000);
+    const allowedEndTime = new Date(meetingTime.getTime() + 30 * 60 * 1000);
+    
+    if (now < allowedStartTime) {
+      const timeUntil = allowedStartTime - now;
+      const formattedTime = formatTimeUntilMeeting(timeUntil);
+      toast.error(`Meeting can be joined in ${formattedTime}`);
+      return;
+    }
+    
+    if (now > allowedEndTime) {
+      toast.error('Meeting join window has expired');
+      return;
+    }
+    
+    // Route to meeting page
+    router.push(`/meeting/${sessionId}`);
   };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      'Scheduled': 'bg-blue-900 text-blue-300',
       'Upcoming': 'bg-blue-900 text-blue-300',
+      'InProgress': 'bg-yellow-900 text-yellow-300',
       'Completed': 'bg-green-900 text-green-300',
+      'Cancelled': 'bg-red-900 text-red-300',
       'Rejected': 'bg-red-900 text-red-300'
     };
 
@@ -156,13 +250,13 @@ export default function MySessionsPage() {
   };
 
   // --- FIX START: Wrapped in IF condition and removed extra closing bracket ---
-  if (isAuthLoading) {
+  if (isAuthLoading || isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg text-blue-400 mb-2">Loading your sessions...</p>
-          <p className="text-sm text-gray-400">Your mentor dashboard is just moments away</p>
+          <p className="text-sm text-gray-400">Your dashboard is just moments away</p>
         </div>
       </div>
     );
@@ -206,7 +300,7 @@ export default function MySessionsPage() {
               </thead>
               <tbody className="divide-y divide-gray-700">
                 {sessions
-                  .filter(session => session.status === 'Upcoming')
+                  .filter(session => session.status === 'Scheduled' || session.status === 'Upcoming')
                   .sort((a, b) => new Date(a.date) - new Date(b.date))
                   .map((session) => (
                     <tr key={session._id} className="hover:bg-gray-800 transition-colors">
@@ -232,16 +326,17 @@ export default function MySessionsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleJoinSession(session._id)}
+                            onClick={() => handleJoinSession(session._id, session.date + 'T' + session.time, session.status)}
                             className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded transition"
                           >
-                            Join Now
+                            Start Meeting
                           </button>
                           <button
-                            onClick={() => handleRejectSession(session._id)}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition"
+                            onClick={() => handleCancelClick(session._id)}
+                            disabled={cancellingMeetingId === session._id}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Reject
+                            {cancellingMeetingId === session._id ? 'Cancelling...' : 'Cancel'}
                           </button>
                         </div>
                       </td>
@@ -251,7 +346,7 @@ export default function MySessionsPage() {
             </table>
           </div>
 
-          {sessions.filter(session => session.status === 'Upcoming').length === 0 && (
+          {sessions.filter(session => session.status === 'Scheduled' || session.status === 'Upcoming').length === 0 && (
             <div className="p-12 text-center">
               <p className="text-gray-400">No upcoming sessions found.</p>
             </div>
@@ -313,6 +408,51 @@ export default function MySessionsPage() {
           )}
         </div>
       </main>
+
+      {/* Cancellation Reason Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-700 max-w-md w-full">
+            <div className="p-6 border-b border-gray-700">
+              <h3 className="text-xl font-semibold text-white">Cancel Meeting</h3>
+              <p className="text-sm text-gray-400 mt-1">Please provide a reason for cancellation</p>
+            </div>
+            
+            <div className="p-6">
+              <label htmlFor="cancellation-reason" className="block text-sm font-medium text-gray-300 mb-2">
+                Cancellation Reason *
+              </label>
+              <textarea
+                id="cancellation-reason"
+                rows={4}
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="e.g., Emergency came up, need to reschedule..."
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                The user will be notified and a full refund will be initiated automatically.
+              </p>
+            </div>
+
+            <div className="p-6 border-t border-gray-700 flex gap-3 justify-end">
+              <button
+                onClick={handleCancelModalClose}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition font-medium"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmCancellation}
+                disabled={!cancellationReason.trim()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

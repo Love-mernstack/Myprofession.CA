@@ -7,7 +7,7 @@ import Image from "next/image"; // No change
 import {
   FaUserCircle, FaBars, FaTimes,
   FaInstagram, FaYoutube, FaEnvelope, FaSearch,
-  FaUser, FaSignOutAlt, FaTachometerAlt
+  FaUser, FaSignOutAlt, FaTachometerAlt, FaCalendarAlt
 } from "react-icons/fa";
 import { IoMdArrowDropdown } from "react-icons/io";
 import AuthModal from "@/components/AuthModal";
@@ -311,12 +311,12 @@ export default function Header() {
 
                     <div className="py-1">
                       <Link
-                        href="/my-sessions"
+                        href="/my-orders"
                         onClick={handleLinkClick}
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 transition duration-200 rounded-lg"
                       >
-                        <FaUser className="mr-3 w-4" />
-                        My Sessions
+                        <FaCalendarAlt className="mr-3 w-4" />
+                        My Orders
                       </Link>
 
                       {user.role === 'MENTOR' && (
@@ -435,11 +435,11 @@ export default function Header() {
                 // LOGGED-IN (MOBILE)
                 <>
                   <Link
-                    href="/my-sessions"
+                    href="/my-orders"
                     onClick={handleLinkClick}
                     className="block text-center w-full px-4 py-2 bg-gray-700 text-white rounded-lg transition"
                   >
-                    My Sessions
+                    My Orders
                   </Link>
                   
                   {user.role === 'MENTOR' && (
